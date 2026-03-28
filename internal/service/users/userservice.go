@@ -3,7 +3,6 @@ package userservice
 import (
 	userErrors "go-project/internal/domain/user/errors"
 	"go-project/internal/domain/user/models"
-	"go-project/internal/repository/interfaces"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
@@ -11,24 +10,33 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type Repository interface {
+	GetUsers() ([]models.User, error)
+	GetUserByID(id string) (models.User, error)
+	CreateUser(user models.User) error
+	UpdateUserByID(id string, userReq models.UserUpdateRequest) (models.User, error)
+	DeleteUserByID(id string) error
+	GetUserByEmail(email string) (models.User, error)
+}
+
 type UserService struct {
-	db    interfaces.IUserStorage
+	repo  Repository
 	valid *validator.Validate
 }
 
-func NewUserService(db interfaces.IUserStorage) *UserService {
+func New(repo Repository) *UserService {
 	return &UserService{
-		db:    db,
+		repo:  repo,
 		valid: validator.New(),
 	}
 }
 
 func (us *UserService) GetUsers() ([]models.User, error) {
-	return us.db.GetUsers()
+	return us.repo.GetUsers()
 }
 
 func (us *UserService) GetUserByID(id string) (models.User, error) {
-	return us.db.GetUserByID(id)
+	return us.repo.GetUserByID(id)
 }
 
 func (us *UserService) CreateUser(user models.User) error {
@@ -46,19 +54,19 @@ func (us *UserService) CreateUser(user models.User) error {
 
 	user.Password = string(hash)
 
-	return us.db.CreateUser(user)
+	return us.repo.CreateUser(user)
 }
 
 func (us *UserService) UpdateUserByID(id string, userReq models.UserUpdateRequest) (models.User, error) {
-	return us.db.UpdateUserByID(id, userReq)
+	return us.repo.UpdateUserByID(id, userReq)
 }
 
 func (us *UserService) DeleteUserByID(id string) error {
-	return us.db.DeleteUserByID(id)
+	return us.repo.DeleteUserByID(id)
 }
 
 func (us *UserService) LoginUser(userReq models.UserRequest) (models.User, error) {
-	userInMemory, err := us.db.GetUserByEmail(userReq.Email)
+	userInMemory, err := us.repo.GetUserByEmail(userReq.Email)
 	if err != nil {
 		return models.User{}, err
 	}

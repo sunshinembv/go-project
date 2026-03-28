@@ -1,19 +1,35 @@
-package server
+package tasks
 
 import (
 	"errors"
 	taskErrors "go-project/internal/domain/task/errors"
-	"go-project/internal/domain/task/models"
-	taskService "go-project/internal/service/task_service"
+	tasksDomain "go-project/internal/domain/task/models"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-func (srv *TodoListApi) getTasks(ctx *gin.Context) {
-	usecase := taskService.NewTaskService(srv.db)
+type TaskService interface {
+	GetTasks() ([]tasksDomain.Task, error)
+	GetTaskByID(id string) (tasksDomain.Task, error)
+	CreateTask(task tasksDomain.Task) (tasksDomain.Task, error)
+	UpdateTaskByID(id string, task tasksDomain.Task) (tasksDomain.Task, error)
+	DeleteTaskByID(id string) error
+}
 
-	tasks, err := usecase.GetTasks()
+type TasksHandler struct {
+	taskService TaskService
+}
+
+func New(taskService TaskService) *TasksHandler {
+	return &TasksHandler{
+		taskService: taskService,
+	}
+}
+
+func (th *TasksHandler) GetTasks(ctx *gin.Context) {
+
+	tasks, err := th.taskService.GetTasks()
 	if err != nil {
 		if errors.Is(err, taskErrors.ErrTaskNotFound) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -26,11 +42,10 @@ func (srv *TodoListApi) getTasks(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"tasks": tasks})
 }
 
-func (srv *TodoListApi) getTaskByID(ctx *gin.Context) {
+func (th *TasksHandler) GetTaskByID(ctx *gin.Context) {
 	taskID := ctx.Param("id")
 
-	usecase := taskService.NewTaskService(srv.db)
-	task, err := usecase.GetTaskByID(taskID)
+	task, err := th.taskService.GetTaskByID(taskID)
 	if err != nil {
 		if errors.Is(err, taskErrors.ErrTaskNotFound) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -43,16 +58,14 @@ func (srv *TodoListApi) getTaskByID(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"task": task})
 }
 
-func (srv *TodoListApi) createTask(ctx *gin.Context) {
-	var task models.Task
+func (th *TasksHandler) CreateTask(ctx *gin.Context) {
+	var task tasksDomain.Task
 
 	if err := ctx.ShouldBindJSON(&task); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
 
-	usecase := taskService.NewTaskService(srv.db)
-
-	taskInStorage, err := usecase.CreateTask(task)
+	taskInStorage, err := th.taskService.CreateTask(task)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -61,17 +74,15 @@ func (srv *TodoListApi) createTask(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, gin.H{"task": taskInStorage})
 }
 
-func (srv *TodoListApi) updateTaskByID(ctx *gin.Context) {
-	var task models.Task
+func (th *TasksHandler) UpdateTaskByID(ctx *gin.Context) {
+	var task tasksDomain.Task
 	taskID := ctx.Param("id")
 
 	if err := ctx.ShouldBindJSON(&task); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
 
-	usecase := taskService.NewTaskService(srv.db)
-
-	updatedTask, err := usecase.UpdateTaskByID(taskID, task)
+	updatedTask, err := th.taskService.UpdateTaskByID(taskID, task)
 	if err != nil {
 		if errors.Is(err, taskErrors.ErrTaskNotFound) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -84,11 +95,10 @@ func (srv *TodoListApi) updateTaskByID(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"task": updatedTask})
 }
 
-func (srv *TodoListApi) deleteTaskByID(ctx *gin.Context) {
+func (th *TasksHandler) DeleteTaskByID(ctx *gin.Context) {
 	taskID := ctx.Param("id")
 
-	usecase := taskService.NewTaskService(srv.db)
-	if err := usecase.DeleteTaskByID(taskID); err != nil {
+	if err := th.taskService.DeleteTaskByID(taskID); err != nil {
 		if errors.Is(err, taskErrors.ErrTaskNotFound) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return

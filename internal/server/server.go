@@ -1,24 +1,28 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"go-project/internal"
 	"go-project/internal/domain"
-	"go-project/internal/repository/interfaces"
-	"go-project/internal/server/auth"
 	"go-project/internal/server/middleware"
+	"go-project/internal/server/tasks"
+	"go-project/internal/server/users"
+	"go-project/internal/service/auth"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-type TodoListApi struct {
-	srv       *http.Server
-	db        interfaces.IStorage
-	jwtSigner auth.HS256Signer
+type Server struct {
+	srv *http.Server
 }
 
-func NewServer(cgf internal.Config, db interfaces.IStorage) *TodoListApi {
+func New(
+	cgf internal.Config,
+	userService users.UserService,
+	taskService tasks.TaskService,
+) *Server {
 	signer := auth.HS256Signer{
 		Secret:     []byte("Secret123321"),
 		Issuer:     "todo_list-service",
@@ -31,86 +35,54 @@ func NewServer(cgf internal.Config, db interfaces.IStorage) *TodoListApi {
 		ReadHeaderTimeout: domain.ReadHeaderTimeout,
 	}
 
-	api := TodoListApi{
-		srv:       &httpSrv,
-		db:        db,
-		jwtSigner: signer,
+	uh := users.New(userService, signer)
+	th := tasks.New(taskService)
+	r := configureRouter(signer, uh, th)
+
+	httpSrv.Handler = r
+
+	return &Server{
+		srv: &httpSrv,
 	}
-
-	api.configRouter()
-
-	fmt.Printf("Server addr %s", fmt.Sprintf("%s:%d", cgf.Host, cgf.Port))
-
-	return &api
 }
 
-func (api *TodoListApi) Run() error {
-	return api.srv.ListenAndServe()
+func (s *Server) Run() error {
+	return s.srv.ListenAndServe()
 }
 
-func (api *TodoListApi) Shutdown() error {
-	return nil
+func (s *Server) Shutdown(ctx context.Context) error {
+	return s.srv.Shutdown(ctx)
 }
 
-func (api *TodoListApi) configRouter() {
+func configureRouter(
+	jwtSigner auth.HS256Signer,
+	uh *users.UsersHandler,
+	th *tasks.TasksHandler,
+) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
-	router := gin.New()
+	router := gin.Default()
 
 	users := router.Group("/users")
 
-	users.POST("/", api.register)
-	users.POST("/login", api.login)
-	users.GET("/profile", middleware.AuthMiddleware(api.jwtSigner), api.profile)
+	users.POST("/", uh.Register)
+	users.POST("/login", uh.Login)
+	users.GET("/profile", middleware.AuthMiddleware(jwtSigner), uh.Profile)
 
-	users.GET("/", middleware.AuthMiddleware(api.jwtSigner), api.getUsers)
-	users.GET("/:id", middleware.AuthMiddleware(api.jwtSigner), api.getUserByID)
-	users.PUT("/:id", middleware.AuthMiddleware(api.jwtSigner), api.updateUserByID)
-	users.DELETE("/:id", middleware.AuthMiddleware(api.jwtSigner), api.deleteUserByID)
+	users.GET("/", middleware.AuthMiddleware(jwtSigner), uh.GetUsers)
+	users.GET("/:id", middleware.AuthMiddleware(jwtSigner), uh.GetUserByID)
+	users.PUT("/:id", middleware.AuthMiddleware(jwtSigner), uh.UpdateUserByID)
+	users.DELETE("/:id", middleware.AuthMiddleware(jwtSigner), uh.DeleteUserByID)
 
 	tasks := router.Group("/tasks")
 
-	tasks.GET("/", middleware.AuthMiddleware(api.jwtSigner), api.getTasks)
-	tasks.GET("/:id", middleware.AuthMiddleware(api.jwtSigner), api.getTaskByID)
-	tasks.POST("/", middleware.AuthMiddleware(api.jwtSigner), api.createTask)
-	tasks.PUT("/:id", middleware.AuthMiddleware(api.jwtSigner), api.updateTaskByID)
-	tasks.DELETE("/:id", middleware.AuthMiddleware(api.jwtSigner), api.deleteTaskByID)
+	tasks.GET("/", middleware.AuthMiddleware(jwtSigner), th.GetTasks)
+	tasks.GET("/:id", middleware.AuthMiddleware(jwtSigner), th.GetTaskByID)
+	tasks.POST("/", middleware.AuthMiddleware(jwtSigner), th.CreateTask)
+	tasks.PUT("/:id", middleware.AuthMiddleware(jwtSigner), th.UpdateTaskByID)
+	tasks.DELETE("/:id", middleware.AuthMiddleware(jwtSigner), th.DeleteTaskByID)
 
-	router.POST("/refresh", api.refresh)
+	router.POST("/refresh", uh.Refresh)
 
-	api.srv.Handler = router
-}
-
-func (srv *TodoListApi) refresh(ctx *gin.Context) {
-	refreshToken, err := ctx.Cookie("refresh_token")
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	claims, err := srv.jwtSigner.ParseRefreshToken(refreshToken, auth.ParseOptions{
-		ExpectedIssuer:   srv.jwtSigner.Issuer,
-		ExpectedAudience: srv.jwtSigner.Audience,
-		AllowedMethods:   []string{"HS256"},
-		Leeway:           domain.LeewayTimeout,
-	})
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	access, err := srv.jwtSigner.NewAccessToken(claims.Subject)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	newRefresh, err := srv.jwtSigner.NewRefreshToken(claims.Subject)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	ctx.SetCookie("refresh_token", newRefresh, domain.CoockeiMaxAge, "/", "localhost", false, true)
-	ctx.JSON(http.StatusOK, gin.H{"access": access})
+	return router
 }

@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"go-project/internal/domain"
-	"go-project/internal/server/auth"
+	"go-project/internal/service/auth"
 	"net/http"
 	"strings"
 
