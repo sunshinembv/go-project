@@ -3,6 +3,8 @@ package inmemory
 import (
 	"go-project/internal/domain/user/errors"
 	"go-project/internal/domain/user/models"
+
+	"github.com/google/uuid"
 )
 
 func (us *Storage) GetUsers() ([]models.User, error) {
@@ -13,28 +15,32 @@ func (us *Storage) GetUsers() ([]models.User, error) {
 	return users, nil
 }
 
-func (us *Storage) GetUserByID(id string) (models.User, error) {
-	user, exists := us.users[id]
+func (us *Storage) GetUserByUID(uid string) (models.User, error) {
+	user, exists := us.users[uid]
 	if !exists {
 		return models.User{}, errors.ErrUserNotFound
 	}
 	return user, nil
 }
 
-func (us *Storage) CreateUser(user models.User) error {
+func (us *Storage) CreateUser(user models.User) (uuid.UUID, error) {
 	for _, userInStorage := range us.users {
 		if user.Email == userInStorage.Email {
-			return errors.ErrUserAlreadyExists
+			return uuid.Nil, errors.ErrUserAlreadyExists
 		}
 	}
+
+	uid := uuid.New()
+	user.UID = uid.String()
+
 	us.users[user.UID] = user
-	return nil
+	return uid, nil
 }
 
-func (us *Storage) UpdateUserByID(id string, userReq models.UserUpdateRequest) (models.User, error) {
-	userInStorage, err := us.GetUserByID(id)
+func (us *Storage) UpdateUserByUID(uid string, userReq models.UserUpdateRequest) (string, string, error) {
+	userInStorage, err := us.GetUserByUID(uid)
 	if err != nil {
-		return models.User{}, err
+		return "", "", err
 	}
 
 	userInStorage.Name = userReq.Name
@@ -42,15 +48,15 @@ func (us *Storage) UpdateUserByID(id string, userReq models.UserUpdateRequest) (
 
 	us.users[userInStorage.UID] = userInStorage
 
-	return userInStorage, nil
+	return userInStorage.Name, userInStorage.Email, nil
 }
 
-func (us *Storage) DeleteUserByID(id string) error {
-	if _, err := us.GetUserByID(id); err != nil {
+func (us *Storage) DeleteUserByUID(uid string) error {
+	if _, err := us.GetUserByUID(uid); err != nil {
 		return err
 	}
 
-	delete(us.users, id)
+	delete(us.users, uid)
 	return nil
 }
 

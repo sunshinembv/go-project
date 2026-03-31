@@ -77,10 +77,10 @@ func configureRouter(
 	tasks := router.Group("/tasks")
 
 	tasks.GET("/", middleware.AuthMiddleware(jwtSigner), th.GetTasks)
-	tasks.GET("/:id", middleware.AuthMiddleware(jwtSigner), th.GetTaskByID)
+	tasks.GET("/:id", middleware.AuthMiddleware(jwtSigner), th.GetTaskByTID)
 	tasks.POST("/", middleware.AuthMiddleware(jwtSigner), th.CreateTask)
-	tasks.PUT("/:id", middleware.AuthMiddleware(jwtSigner), th.UpdateTaskByID)
-	tasks.DELETE("/:id", middleware.AuthMiddleware(jwtSigner), th.DeleteTaskByID)
+	tasks.PUT("/:id", middleware.AuthMiddleware(jwtSigner), th.UpdateTaskByTID)
+	tasks.DELETE("/:id", middleware.AuthMiddleware(jwtSigner), th.DeleteTaskByTID)
 
 	router.POST("/refresh", uh.Refresh)
 

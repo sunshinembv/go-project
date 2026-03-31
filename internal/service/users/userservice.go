@@ -2,7 +2,7 @@ package userservice
 
 import (
 	userErrors "go-project/internal/domain/user/errors"
-	"go-project/internal/domain/user/models"
+	usersDomain "go-project/internal/domain/user/models"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
@@ -11,12 +11,12 @@ import (
 )
 
 type Repository interface {
-	GetUsers() ([]models.User, error)
-	GetUserByID(id string) (models.User, error)
-	CreateUser(user models.User) error
-	UpdateUserByID(id string, userReq models.UserUpdateRequest) (models.User, error)
-	DeleteUserByID(id string) error
-	GetUserByEmail(email string) (models.User, error)
+	GetUsers() ([]usersDomain.User, error)
+	GetUserByUID(id string) (usersDomain.User, error)
+	CreateUser(user usersDomain.User) (uuid.UUID, error)
+	UpdateUserByUID(id string, userReq usersDomain.UserUpdateRequest) (string, string, error)
+	DeleteUserByUID(id string) error
+	GetUserByEmail(email string) (usersDomain.User, error)
 }
 
 type UserService struct {
@@ -31,49 +31,51 @@ func New(repo Repository) *UserService {
 	}
 }
 
-func (us *UserService) GetUsers() ([]models.User, error) {
+func (us *UserService) GetUsers() ([]usersDomain.User, error) {
 	return us.repo.GetUsers()
 }
 
-func (us *UserService) GetUserByID(id string) (models.User, error) {
-	return us.repo.GetUserByID(id)
+func (us *UserService) GetUserByUID(id string) (usersDomain.User, error) {
+	return us.repo.GetUserByUID(id)
 }
 
-func (us *UserService) CreateUser(user models.User) error {
+func (us *UserService) CreateUser(user usersDomain.User) (string, error) {
 	if err := us.valid.Struct(user); err != nil {
-		return err
+		return "", err
 	}
-
-	uid := uuid.New().String()
-	user.UID = uid
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	user.Password = string(hash)
 
-	return us.repo.CreateUser(user)
-}
-
-func (us *UserService) UpdateUserByID(id string, userReq models.UserUpdateRequest) (models.User, error) {
-	return us.repo.UpdateUserByID(id, userReq)
-}
-
-func (us *UserService) DeleteUserByID(id string) error {
-	return us.repo.DeleteUserByID(id)
-}
-
-func (us *UserService) LoginUser(userReq models.UserRequest) (models.User, error) {
-	userInMemory, err := us.repo.GetUserByEmail(userReq.Email)
+	uid, err := us.repo.CreateUser(user)
 	if err != nil {
-		return models.User{}, err
+		return "", err
 	}
 
-	if err = bcrypt.CompareHashAndPassword([]byte(userInMemory.Password), []byte(userReq.Password)); err != nil {
-		return models.User{}, userErrors.ErrInvalidPassword
+	return uid.String(), nil
+}
+
+func (us *UserService) UpdateUserByUID(id string, userReq usersDomain.UserUpdateRequest) (string, string, error) {
+	return us.repo.UpdateUserByUID(id, userReq)
+}
+
+func (us *UserService) DeleteUserByUID(id string) error {
+	return us.repo.DeleteUserByUID(id)
+}
+
+func (us *UserService) LoginUser(userReq usersDomain.UserRequest) (usersDomain.User, error) {
+	storageUser, err := us.repo.GetUserByEmail(userReq.Email)
+	if err != nil {
+		return usersDomain.User{}, err
 	}
 
-	return userInMemory, nil
+	if err = bcrypt.CompareHashAndPassword([]byte(storageUser.Password), []byte(userReq.Password)); err != nil {
+		return usersDomain.User{}, userErrors.ErrInvalidPassword
+	}
+
+	return storageUser, nil
 }

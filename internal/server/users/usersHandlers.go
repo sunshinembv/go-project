@@ -13,10 +13,10 @@ import (
 
 type UserService interface {
 	GetUsers() ([]usersDomain.User, error)
-	GetUserByID(id string) (usersDomain.User, error)
-	CreateUser(user usersDomain.User) error
-	UpdateUserByID(id string, userReq usersDomain.UserUpdateRequest) (usersDomain.User, error)
-	DeleteUserByID(id string) error
+	GetUserByUID(id string) (usersDomain.User, error)
+	CreateUser(user usersDomain.User) (string, error)
+	UpdateUserByUID(id string, userReq usersDomain.UserUpdateRequest) (string, string, error)
+	DeleteUserByUID(id string) error
 	LoginUser(userReq usersDomain.UserRequest) (usersDomain.User, error)
 }
 
@@ -50,7 +50,7 @@ func (uh *UsersHandler) GetUsers(ctx *gin.Context) {
 func (uh *UsersHandler) GetUserByID(ctx *gin.Context) {
 	userID := ctx.Param("id")
 
-	user, err := uh.userService.GetUserByID(userID)
+	user, err := uh.userService.GetUserByUID(userID)
 	if err != nil {
 		if errors.Is(err, userErrors.ErrUserNotFound) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -70,12 +70,13 @@ func (uh *UsersHandler) Register(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
 
-	if err := uh.userService.CreateUser(user); err != nil {
+	uid, err := uh.userService.CreateUser(user)
+	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, gin.H{"msg": "register success"})
+	ctx.JSON(http.StatusOK, gin.H{"uid": uid})
 }
 
 func (uh *UsersHandler) UpdateUserByID(ctx *gin.Context) {
@@ -86,7 +87,7 @@ func (uh *UsersHandler) UpdateUserByID(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
 
-	updatedUser, err := uh.userService.UpdateUserByID(userID, userUpdateReq)
+	updatedName, updatedEmail, err := uh.userService.UpdateUserByUID(userID, userUpdateReq)
 	if err != nil {
 		if errors.Is(err, userErrors.ErrUserNoExists) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -96,13 +97,16 @@ func (uh *UsersHandler) UpdateUserByID(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"user": updatedUser})
+	ctx.JSON(http.StatusOK, gin.H{
+		"updatedName":  updatedName,
+		"updatedEmail": updatedEmail,
+	})
 }
 
 func (uh *UsersHandler) DeleteUserByID(ctx *gin.Context) {
 	userID := ctx.Param("id")
 
-	if err := uh.userService.DeleteUserByID(userID); err != nil {
+	if err := uh.userService.DeleteUserByUID(userID); err != nil {
 		if errors.Is(err, userErrors.ErrUserNoExists) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
@@ -151,18 +155,13 @@ func (uh *UsersHandler) Login(ctx *gin.Context) {
 }
 
 func (uh *UsersHandler) Profile(ctx *gin.Context) {
-	userID, exists := ctx.Get("userID")
-	if !exists {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "userID not found in context"})
+	uid := ctx.GetString("userID")
+	if uid == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
-	uid, ok := userID.(string)
-	if !ok {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "userID is not a string"})
-		return
-	}
-	user, err := uh.userService.GetUserByID(uid)
+	user, err := uh.userService.GetUserByUID(uid)
 	if err != nil {
 		if errors.Is(err, userErrors.ErrUserNoExists) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})

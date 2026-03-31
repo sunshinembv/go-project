@@ -10,11 +10,11 @@ import (
 )
 
 type TaskService interface {
-	GetTasks() ([]tasksDomain.Task, error)
-	GetTaskByID(id string) (tasksDomain.Task, error)
-	CreateTask(task tasksDomain.Task) (tasksDomain.Task, error)
-	UpdateTaskByID(id string, task tasksDomain.Task) (tasksDomain.Task, error)
-	DeleteTaskByID(id string) error
+	GetTasks(uid string) ([]tasksDomain.Task, error)
+	GetTaskByTID(uid string, tid string) (tasksDomain.Task, error)
+	CreateTask(uid string, req tasksDomain.TaskRequest) (string, error)
+	UpdateTaskByTID(uid string, tid string, req tasksDomain.TaskRequest) (tasksDomain.Task, error)
+	DeleteTaskByTID(uid string, tid string) error
 }
 
 type TasksHandler struct {
@@ -28,8 +28,13 @@ func New(taskService TaskService) *TasksHandler {
 }
 
 func (th *TasksHandler) GetTasks(ctx *gin.Context) {
+	uid := ctx.GetString("userID")
+	if uid == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 
-	tasks, err := th.taskService.GetTasks()
+	tasks, err := th.taskService.GetTasks(uid)
 	if err != nil {
 		if errors.Is(err, taskErrors.ErrTaskNotFound) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -42,10 +47,16 @@ func (th *TasksHandler) GetTasks(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"tasks": tasks})
 }
 
-func (th *TasksHandler) GetTaskByID(ctx *gin.Context) {
-	taskID := ctx.Param("id")
+func (th *TasksHandler) GetTaskByTID(ctx *gin.Context) {
+	uid := ctx.GetString("userID")
+	if uid == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 
-	task, err := th.taskService.GetTaskByID(taskID)
+	tid := ctx.Param("id")
+
+	task, err := th.taskService.GetTaskByTID(uid, tid)
 	if err != nil {
 		if errors.Is(err, taskErrors.ErrTaskNotFound) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -59,30 +70,42 @@ func (th *TasksHandler) GetTaskByID(ctx *gin.Context) {
 }
 
 func (th *TasksHandler) CreateTask(ctx *gin.Context) {
-	var task tasksDomain.Task
+	uid := ctx.GetString("userID")
+	if uid == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 
-	if err := ctx.ShouldBindJSON(&task); err != nil {
+	var req tasksDomain.TaskRequest
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
 
-	taskInStorage, err := th.taskService.CreateTask(task)
+	tid, err := th.taskService.CreateTask(uid, req)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, gin.H{"task": taskInStorage})
+	ctx.JSON(http.StatusCreated, gin.H{"tid": tid})
 }
 
-func (th *TasksHandler) UpdateTaskByID(ctx *gin.Context) {
-	var task tasksDomain.Task
-	taskID := ctx.Param("id")
+func (th *TasksHandler) UpdateTaskByTID(ctx *gin.Context) {
+	uid := ctx.GetString("userID")
+	if uid == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 
-	if err := ctx.ShouldBindJSON(&task); err != nil {
+	var req tasksDomain.TaskRequest
+	tid := ctx.Param("id")
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
 
-	updatedTask, err := th.taskService.UpdateTaskByID(taskID, task)
+	updatedTask, err := th.taskService.UpdateTaskByTID(uid, tid, req)
 	if err != nil {
 		if errors.Is(err, taskErrors.ErrTaskNotFound) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -95,10 +118,16 @@ func (th *TasksHandler) UpdateTaskByID(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"task": updatedTask})
 }
 
-func (th *TasksHandler) DeleteTaskByID(ctx *gin.Context) {
-	taskID := ctx.Param("id")
+func (th *TasksHandler) DeleteTaskByTID(ctx *gin.Context) {
+	uid := ctx.GetString("userID")
+	if uid == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 
-	if err := th.taskService.DeleteTaskByID(taskID); err != nil {
+	tid := ctx.Param("id")
+
+	if err := th.taskService.DeleteTaskByTID(uid, tid); err != nil {
 		if errors.Is(err, taskErrors.ErrTaskNotFound) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
