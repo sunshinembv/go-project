@@ -10,7 +10,7 @@ type Storage struct {
 	tasks map[string]taskModels.Task
 }
 
-func NewInMemoryStorage() *Storage {
+func New() *Storage {
 	return &Storage{
 		users: make(map[string]userModels.User),
 		tasks: make(map[string]taskModels.Task),
