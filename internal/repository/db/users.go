@@ -49,7 +49,8 @@ func (s *Storage) CreateUser(user usersDomain.User) (uuid.UUID, error) {
 			ctx,
 			`INSERT INTO users (name, email, password_hash)
 		VALUES ($1, $2, $3)
-		ON CONFLICT (uid) DO NOTHING;`,
+		ON CONFLICT (uid) DO NOTHING
+		RETURNING uid;`,
 			user.Name, user.Email, user.Password,
 		).Scan(&uid)
 		if err != nil {
@@ -60,7 +61,8 @@ func (s *Storage) CreateUser(user usersDomain.User) (uuid.UUID, error) {
 			ctx,
 			`INSERT INTO users (uid, name, email, password_hash)
 		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (uid) DO NOTHING;`,
+		ON CONFLICT (uid) DO NOTHING
+		RETURNING uid;`,
 			user.UID, user.Name, user.Email, user.Password,
 		).Scan(&uid)
 		if err != nil {

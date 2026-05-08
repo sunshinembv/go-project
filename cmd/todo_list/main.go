@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"go-project/internal"
 	"go-project/internal/repository/db"
@@ -11,19 +12,24 @@ import (
 	userservice "go-project/internal/service/users"
 	storageinterfaces "go-project/internal/storage_interfaces"
 	"os"
+	"time"
 )
 
 func main() {
-	cfg := internal.ReadConfig()
-	dbDSN := cfg.DbDSN
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
 
-	repo := NewRepo(dbDSN)
+	cfg := internal.ReadConfig()
+	cfg.ConfigureLogger()
+
+	dbDSN := cfg.DbDSN
+	repo := NewRepo(ctx, dbDSN)
 
 	userService := userservice.New(repo)
 	taskService := taskservice.New(repo)
 
 	srv := server.New(
-		cfg,
+		*cfg,
 		userService,
 		taskService,
 	)
@@ -33,9 +39,9 @@ func main() {
 	}
 }
 
-func NewRepo(dbDSN string) storageinterfaces.Repositories {
+func NewRepo(ctx context.Context, dbDSN string) storageinterfaces.Repositories {
 
-	repo, err := db.New(dbDSN)
+	repo, err := db.New(ctx, dbDSN)
 	if err != nil {
 		fmt.Printf("DB connection error: %v", err)
 		return NewPersistent()
