@@ -1,5 +1,5 @@
 services:
-  postgres:
+  db:
     image: postgres
     restart: always
     ports:
@@ -8,3 +8,21 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: todolist
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d todolist"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - TODO_LIST_SERVICE_DB_DSN=postgres://user:password@db:5432/todolist?sslmode=disable
+    volumes:
+      - ./migrations:/root/migrations
+    depends_on:
+      db:
+        condition: service_healthy

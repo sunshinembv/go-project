@@ -31,7 +31,7 @@ func New(
 		RefreshTTL: domain.RefreshTTL,
 	}
 	httpSrv := http.Server{
-		Addr:              fmt.Sprintf("%s:%d", cgf.Host, cgf.Port),
+		Addr:              fmt.Sprintf("%s:%s", cgf.Host, cgf.Port),
 		ReadHeaderTimeout: domain.ReadHeaderTimeout,
 	}
 
