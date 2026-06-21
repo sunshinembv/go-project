@@ -6,6 +6,7 @@ import (
 	"go-project/internal"
 	"go-project/internal/domain"
 	"go-project/internal/server/middleware"
+	"go-project/internal/server/middleware/gzip"
 	"go-project/internal/server/tasks"
 	"go-project/internal/server/users"
 	"go-project/internal/service/auth"
@@ -62,6 +63,9 @@ func configureRouter(
 	gin.SetMode(gin.ReleaseMode)
 
 	router := gin.Default()
+
+	router.Use(gzip.GunzipMiddleware())
+	router.Use(gzip.GzipMiddleware())
 
 	users := router.Group("/users")
 
