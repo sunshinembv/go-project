@@ -80,6 +80,7 @@ func (th *TasksHandler) CreateTask(ctx *gin.Context) {
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	tid, err := th.taskService.CreateTask(uid, req)
