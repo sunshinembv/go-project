@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -14,7 +16,11 @@ import (
 )
 
 type Storage struct {
-	conn *pgxpool.Pool
+	conn                       *pgxpool.Pool
+	deletedTasksCount          atomic.Uint64
+	deletedTasksCleanupRunning atomic.Bool
+	deletedTasksWorker         sync.WaitGroup
+	closeOnce                  sync.Once
 }
 
 func New(ctx context.Context, dbDSN string) (*Storage, error) {
@@ -28,9 +34,7 @@ func New(ctx context.Context, dbDSN string) (*Storage, error) {
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		err = conn.Ping(ctx)
 		if err == nil {
-			return &Storage{
-				conn: conn,
-			}, nil
+			return &Storage{conn: conn}, nil
 		}
 
 		sleep := time.Duration(1<<uint(attempt-1)) * time.Second
@@ -61,8 +65,13 @@ func New(ctx context.Context, dbDSN string) (*Storage, error) {
 	return nil, fmt.Errorf("failed to connect to db after %d attempts: %w", maxAttempts, err)
 }
 
-func (s *Storage) Close() {
-	s.conn.Close()
+func (s *Storage) Close() error {
+	s.closeOnce.Do(func() {
+		s.deletedTasksWorker.Wait()
+		s.conn.Close()
+	})
+
+	return nil
 }
 
 func RunMigrations(dbDSN string) error {

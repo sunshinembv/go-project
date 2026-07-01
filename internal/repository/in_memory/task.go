@@ -18,7 +18,7 @@ func (us *Storage) GetAllTasks() ([]models.Task, error) {
 func (us *Storage) GetTasks(uid string) ([]models.Task, error) {
 	tasks := make([]models.Task, 0, len(us.tasks))
 	for _, task := range us.tasks {
-		if task.UID == uid {
+		if task.UID == uid && !task.Deleted {
 			tasks = append(tasks, task)
 		}
 	}
@@ -27,7 +27,7 @@ func (us *Storage) GetTasks(uid string) ([]models.Task, error) {
 
 func (us *Storage) GetTaskByTID(uid string, tid string) (models.Task, error) {
 	task, exists := us.tasks[tid]
-	if !exists || task.UID != uid {
+	if !exists || task.UID != uid || task.Deleted {
 		return models.Task{}, errors.ErrTaskNotFound
 	}
 	return task, nil
@@ -66,10 +66,12 @@ func (us *Storage) UpdateTaskByTID(uid string, tid string, req models.TaskReques
 }
 
 func (us *Storage) DeleteTaskByTID(uid string, tid string) error {
-	if _, err := us.GetTaskByTID(uid, tid); err != nil {
+	task, err := us.GetTaskByTID(uid, tid)
+	if err != nil {
 		return err
 	}
 
-	delete(us.tasks, tid)
+	task.Deleted = true
+	us.tasks[tid] = task
 	return nil
 }

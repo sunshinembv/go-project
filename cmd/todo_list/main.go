@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"go-project/internal"
 	"go-project/internal/repository/db"
@@ -11,7 +12,10 @@ import (
 	taskservice "go-project/internal/service/tasks"
 	userservice "go-project/internal/service/users"
 	storageinterfaces "go-project/internal/storage_interfaces"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -24,6 +28,11 @@ func main() {
 
 	dbDSN := cfg.DbDSN
 	repo := NewRepo(ctx, dbDSN)
+	defer func() {
+		if err := repo.Close(); err != nil {
+			fmt.Printf("Failed to close repository: %v\n", err)
+		}
+	}()
 
 	userService := userservice.New(repo)
 	taskService := taskservice.New(repo)
@@ -34,9 +43,38 @@ func main() {
 		taskService,
 	)
 
-	if err := srv.Run(); err != nil {
-		fmt.Println("Failed to start server")
+	serverErr := make(chan error, 1)
+	go func() {
+		serverErr <- srv.Run()
+	}()
+
+	shutdownCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	select {
+	case err := <-serverErr:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			fmt.Printf("Server error: %v\n", err)
+		}
+		return
+	case <-shutdownCtx.Done():
+		fmt.Println("Shutdown signal received")
 	}
+
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		fmt.Printf("Failed to shutdown server gracefully: %v\n", err)
+		return
+	}
+
+	if err := <-serverErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
+		fmt.Printf("Server error: %v\n", err)
+		return
+	}
+
+	fmt.Println("Server stopped gracefully")
 }
 
 func NewRepo(ctx context.Context, dbDSN string) storageinterfaces.Repositories {
@@ -48,6 +86,9 @@ func NewRepo(ctx context.Context, dbDSN string) storageinterfaces.Repositories {
 	}
 	if err := db.RunMigrations(dbDSN); err != nil {
 		fmt.Printf("DB migrations error: %v", err)
+		if closeErr := repo.Close(); closeErr != nil {
+			fmt.Printf("DB close error: %v", closeErr)
+		}
 		return NewPersistent()
 	}
 
@@ -58,6 +99,9 @@ func NewRepo(ctx context.Context, dbDSN string) storageinterfaces.Repositories {
 	}
 
 	for _, task := range dump.Tasks {
+		if task.Deleted {
+			continue
+		}
 		_, _ = repo.CreateTask(task.UID, task)
 	}
 
