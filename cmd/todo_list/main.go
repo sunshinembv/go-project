@@ -99,6 +99,9 @@ func NewRepo(ctx context.Context, dbDSN string) storageinterfaces.Repositories {
 	}
 
 	for _, task := range dump.Tasks {
+		if task.Deleted {
+			continue
+		}
 		_, _ = repo.CreateTask(task.UID, task)
 	}
 

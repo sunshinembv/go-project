@@ -6,6 +6,7 @@ type Task struct {
 	Title       string
 	Description string
 	Status      Status
+	Deleted     bool
 }
 
 type TaskRequest struct {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -14,7 +15,10 @@ import (
 )
 
 type Storage struct {
-	conn *pgxpool.Pool
+	conn               *pgxpool.Pool
+	deletedTasks       chan struct{}
+	deletedTasksWorker sync.WaitGroup
+	closeOnce          sync.Once
 }
 
 func New(ctx context.Context, dbDSN string) (*Storage, error) {
@@ -28,9 +32,14 @@ func New(ctx context.Context, dbDSN string) (*Storage, error) {
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		err = conn.Ping(ctx)
 		if err == nil {
-			return &Storage{
-				conn: conn,
-			}, nil
+			storage := &Storage{
+				conn:         conn,
+				deletedTasks: make(chan struct{}, deletedTasksBatchSize),
+			}
+			storage.deletedTasksWorker.Add(1)
+			go storage.runDeletedTasksWorker()
+
+			return storage, nil
 		}
 
 		sleep := time.Duration(1<<uint(attempt-1)) * time.Second
@@ -62,7 +71,12 @@ func New(ctx context.Context, dbDSN string) (*Storage, error) {
 }
 
 func (s *Storage) Close() error {
-	s.conn.Close()
+	s.closeOnce.Do(func() {
+		close(s.deletedTasks)
+		s.deletedTasksWorker.Wait()
+		s.conn.Close()
+	})
+
 	return nil
 }
 
