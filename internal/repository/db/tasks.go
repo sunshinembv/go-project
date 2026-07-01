@@ -12,7 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const deletedTasksBatchSize = 10
+const deletedTasksBatchSize uint64 = 10
 
 func (s *Storage) GetTasks(uid string) ([]tasksDomain.Task, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -115,7 +115,9 @@ func (s *Storage) DeleteTaskByTID(uid string, tid string) error {
 		return tasksErrors.ErrTaskNotFound
 	}
 
-	s.deletedTasks <- struct{}{}
+	if s.deletedTasksCount.Add(1) >= deletedTasksBatchSize {
+		s.startDeletedTasksWorker()
+	}
 
 	return nil
 }
@@ -148,24 +150,65 @@ func (s *Storage) GetTaskByTID(uid string, tid string) (tasksDomain.Task, error)
 	return task, nil
 }
 
+func (s *Storage) startDeletedTasksWorker() {
+	if !s.deletedTasksCleanupRunning.CompareAndSwap(false, true) {
+		return
+	}
+
+	s.deletedTasksWorker.Add(1)
+	go s.runDeletedTasksWorker()
+}
+
 func (s *Storage) runDeletedTasksWorker() {
 	defer s.deletedTasksWorker.Done()
 
-	batchSize := 0
-	for range s.deletedTasks {
-		batchSize++
-		if batchSize < deletedTasksBatchSize {
+	for {
+		countBeforeBatch, ok := s.takeDeletedTasksBatch()
+		if !ok {
+			if s.releaseDeletedTasksWorker() {
+				return
+			}
 			continue
 		}
 
 		if err := s.deleteMarkedTasks(); err != nil {
 			log.Error().Err(err).Msg("failed to delete marked tasks")
-			// Retry on the next delete without starting a tight retry loop.
-			batchSize = deletedTasksBatchSize - 1
-			continue
+			s.deletedTasksCount.Add(deletedTasksBatchSize)
+			if s.releaseDeletedTasksWorkerAfterFailure(countBeforeBatch) {
+				return
+			}
 		}
-		batchSize = 0
 	}
+}
+
+func (s *Storage) takeDeletedTasksBatch() (uint64, bool) {
+	for {
+		count := s.deletedTasksCount.Load()
+		if count < deletedTasksBatchSize {
+			return 0, false
+		}
+		if s.deletedTasksCount.CompareAndSwap(count, count-deletedTasksBatchSize) {
+			return count, true
+		}
+	}
+}
+
+func (s *Storage) releaseDeletedTasksWorker() bool {
+	s.deletedTasksCleanupRunning.Store(false)
+	if s.deletedTasksCount.Load() < deletedTasksBatchSize {
+		return true
+	}
+
+	return !s.deletedTasksCleanupRunning.CompareAndSwap(false, true)
+}
+
+func (s *Storage) releaseDeletedTasksWorkerAfterFailure(countBeforeBatch uint64) bool {
+	s.deletedTasksCleanupRunning.Store(false)
+	if s.deletedTasksCount.Load() <= countBeforeBatch {
+		return true
+	}
+
+	return !s.deletedTasksCleanupRunning.CompareAndSwap(false, true)
 }
 
 func (s *Storage) deleteMarkedTasks() error {
