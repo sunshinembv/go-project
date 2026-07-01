@@ -61,8 +61,9 @@ func New(ctx context.Context, dbDSN string) (*Storage, error) {
 	return nil, fmt.Errorf("failed to connect to db after %d attempts: %w", maxAttempts, err)
 }
 
-func (s *Storage) Close() {
+func (s *Storage) Close() error {
 	s.conn.Close()
+	return nil
 }
 
 func RunMigrations(dbDSN string) error {
