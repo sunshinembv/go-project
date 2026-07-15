@@ -16,3 +16,7 @@ func New() *Storage {
 		tasks: make(map[string]taskModels.Task),
 	}
 }
+
+func (s *Storage) Close() error {
+	return nil
+}

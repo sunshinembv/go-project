@@ -57,3 +57,7 @@ func (s *PersistentStorage) persist() error {
 	}
 	return SaveToFile(s.Path, dump)
 }
+
+func (s *PersistentStorage) Close() error {
+	return s.persist()
+}
