@@ -1,0 +1,10 @@
+template: testify
+
+packages:
+  go-project:
+    config:
+      all: true
+      recursive: true
+      dir: "internal/mocks/{{.SrcPackageName}}"
+      pkgname: "mock{{.SrcPackageName}}"
+      filename: "mock_{{.InterfaceName}}.go"
