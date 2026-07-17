@@ -3,6 +3,7 @@ package gzip
 import (
 	"bytes"
 	stdgzip "compress/gzip"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -27,7 +28,11 @@ func gunzipData(t *testing.T, data []byte) []byte {
 	t.Helper()
 	reader, err := stdgzip.NewReader(bytes.NewReader(data))
 	require.NoError(t, err)
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			fmt.Printf("Failed to close resource: %v\n", err)
+		}
+	}()
 	result, err := io.ReadAll(reader)
 	require.NoError(t, err)
 	return result

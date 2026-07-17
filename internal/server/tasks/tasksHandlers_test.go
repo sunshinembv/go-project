@@ -76,7 +76,17 @@ func BenchmarkGetTasks(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req.Send()
+		resp, err := req.Send()
+		if err != nil {
+			b.Fatalf("Failed to send request: %v", err)
+		}
+
+		if resp.StatusCode() != http.StatusOK {
+			b.Fatalf("Unexpected status code: got %d, want %d",
+				resp.StatusCode(),
+				http.StatusOK,
+			)
+		}
 	}
 }
 
@@ -102,7 +112,17 @@ func BenchmarkGetTaskByTID(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req.Send()
+		resp, err := req.Send()
+		if err != nil {
+			b.Fatalf("Failed to send request: %v", err)
+		}
+
+		if resp.StatusCode() != http.StatusOK {
+			b.Fatalf("Unexpected status code: got %d, want %d",
+				resp.StatusCode(),
+				http.StatusOK,
+			)
+		}
 	}
 }
 
@@ -131,7 +151,17 @@ func BenchmarkCreateTask(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req.Send()
+		resp, err := req.Send()
+		if err != nil {
+			b.Fatalf("Failed to send request: %v", err)
+		}
+
+		if resp.StatusCode() != http.StatusOK {
+			b.Fatalf("Unexpected status code: got %d, want %d",
+				resp.StatusCode(),
+				http.StatusOK,
+			)
+		}
 	}
 }
 
@@ -166,7 +196,17 @@ func BenchmarkUpdateTaskByTID(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req.Send()
+		resp, err := req.Send()
+		if err != nil {
+			b.Fatalf("Failed to send request: %v", err)
+		}
+
+		if resp.StatusCode() != http.StatusOK {
+			b.Fatalf("Unexpected status code: got %d, want %d",
+				resp.StatusCode(),
+				http.StatusOK,
+			)
+		}
 	}
 }
 
@@ -188,7 +228,17 @@ func BenchmarkDeleteTaskByTID(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req.Send()
+		resp, err := req.Send()
+		if err != nil {
+			b.Fatalf("Failed to send request: %v", err)
+		}
+
+		if resp.StatusCode() != http.StatusOK {
+			b.Fatalf("Unexpected status code: got %d, want %d",
+				resp.StatusCode(),
+				http.StatusOK,
+			)
+		}
 	}
 }
 

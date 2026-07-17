@@ -115,10 +115,14 @@ func NewPersistent() storageinterfaces.Repositories {
 	dump, _ := persistence.LoadFromFile("dump.json")
 
 	for _, user := range dump.Users {
-		repo.CreateUser(user)
+		if _, err := repo.CreateUser(user); err != nil {
+			fmt.Printf("Failed to restore user: %v", err)
+		}
 	}
 	for _, task := range dump.Tasks {
-		repo.CreateTask(task.UID, task)
+		if _, err := repo.CreateTask(task.UID, task); err != nil {
+			fmt.Printf("Failed to restore task: %v", err)
+		}
 	}
 
 	persistent := &persistence.PersistentStorage{

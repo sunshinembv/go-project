@@ -6,8 +6,8 @@ import (
 )
 
 var (
-	NoSuchElementErr   = errors.New("нет такого элемента")
-	IndexOutOfBoundErr = errors.New("индекс выходит за пределы допустимого диапазона")
+	ErrNoSuchElement   = errors.New("нет такого элемента")
+	ErrIndexOutOfBound = errors.New("индекс выходит за пределы допустимого диапазона")
 )
 
 type LinkedList struct {
@@ -28,7 +28,7 @@ func NewLinkedList() *LinkedList {
 
 func (ll *LinkedList) Add(index int, item int) error {
 	if index < 0 || index > ll.Size {
-		return IndexOutOfBoundErr
+		return ErrIndexOutOfBound
 	}
 
 	if index == 0 {
@@ -89,7 +89,7 @@ func (ll *LinkedList) AddLast(item int) {
 
 func (ll *LinkedList) Remove(index int) (*Node, error) {
 	if index < 0 || index >= ll.Size {
-		return nil, IndexOutOfBoundErr
+		return nil, ErrIndexOutOfBound
 	}
 
 	if index == 0 {
@@ -115,7 +115,7 @@ func (ll *LinkedList) Remove(index int) (*Node, error) {
 
 func (ll *LinkedList) RemoveFirst() (*Node, error) {
 	if ll.IsEmpty() {
-		return nil, NoSuchElementErr
+		return nil, ErrNoSuchElement
 	}
 
 	removedNode := ll.First
@@ -136,7 +136,7 @@ func (ll *LinkedList) RemoveFirst() (*Node, error) {
 
 func (ll *LinkedList) RemoveLast() (*Node, error) {
 	if ll.IsEmpty() {
-		return nil, NoSuchElementErr
+		return nil, ErrNoSuchElement
 	}
 
 	removedNode := ll.Last
@@ -157,7 +157,7 @@ func (ll *LinkedList) RemoveLast() (*Node, error) {
 
 func (ll *LinkedList) Get(index int) (*Node, error) {
 	if index < 0 || index >= ll.Size {
-		return nil, IndexOutOfBoundErr
+		return nil, ErrIndexOutOfBound
 	}
 
 	currentNode := ll.First
@@ -195,8 +195,12 @@ func main() {
 
 	linkedList.AddFirst(0)
 	linkedList.AddFirst(1)
-	linkedList.Add(1, 2)
-	linkedList.Add(2, 3)
+	if err := linkedList.Add(1, 2); err != nil {
+		fmt.Printf("Failed to add num: %v", err)
+	}
+	if err := linkedList.Add(2, 3); err != nil {
+		fmt.Printf("Failed to add num: %v", err)
+	}
 
 	printList(linkedList)
 
