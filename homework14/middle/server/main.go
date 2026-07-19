@@ -13,13 +13,21 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			fmt.Printf("Failed to close resource: %v\n", err)
+		}
+	}()
 
 	ch, err := conn.Channel()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer ch.Close()
+	defer func() {
+		if err := ch.Close(); err != nil {
+			fmt.Printf("Failed to close resource: %v\n", err)
+		}
+	}()
 
 	q, err := ch.QueueDeclare(
 		"rpc_queue",
