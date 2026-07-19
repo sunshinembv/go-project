@@ -119,7 +119,11 @@ func readJSONConfig(path string, cfg *Config) error {
 	if err != nil {
 		return fmt.Errorf("open config %q: %w", path, err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Failed to close resource: %v\n", err)
+		}
+	}()
 
 	decoder := json.NewDecoder(file)
 	decoder.DisallowUnknownFields()
