@@ -23,7 +23,11 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	cfg := internal.ReadConfig()
+	cfg, err := internal.ReadConfig()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to read config: %v\n", err)
+		os.Exit(1)
+	}
 	cfg.ConfigureLogger()
 
 	dbDSN := cfg.DbDSN
