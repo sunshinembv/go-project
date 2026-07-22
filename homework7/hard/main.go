@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	TicketAlreadyBookedError = errors.New("Ticket already booked")
-	InvalidTicketIDError     = errors.New("invalid ticket id")
+	ErrTicketAlreadyBooked = errors.New("Ticket already booked")
+	ErrInvalidTicketID     = errors.New("invalid ticket id")
 )
 
 type BookingTrainTicketsService struct {
@@ -35,12 +35,12 @@ type BookingRequest struct {
 
 func (bs *BookingTrainTicketsService) Book(req BookingRequest) (*Ticket, error) {
 	if req.ticketID < 0 || req.ticketID >= len(bs.tickets) {
-		return nil, InvalidTicketIDError
+		return nil, ErrInvalidTicketID
 	}
 
 	ticket := bs.tickets[req.ticketID]
 	if !ticket.isAvailable.CompareAndSwap(true, false) {
-		return nil, TicketAlreadyBookedError
+		return nil, ErrTicketAlreadyBooked
 	}
 	ticket.AgencyName = req.agency.name
 	return ticket, nil

@@ -2,6 +2,7 @@ package gzip
 
 import (
 	"compress/gzip"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -24,7 +25,11 @@ func GunzipMiddleware() gin.HandlerFunc {
 			return
 		}
 		ctx.Request.Body = io.NopCloser(r)
-		defer r.Close()
+		defer func() {
+			if err := r.Close(); err != nil {
+				fmt.Printf("Failed to close resource: %v\n", err)
+			}
+		}()
 		ctx.Next()
 	}
 }
@@ -42,7 +47,11 @@ func GzipMiddleware() gin.HandlerFunc {
 			ResponseWriter: ctx.Writer,
 		}
 		ctx.Writer = gzw
-		defer gzw.Close()
+		defer func() {
+			if err := gzw.Close(); err != nil {
+				fmt.Printf("Failed to close resource: %v\n", err)
+			}
+		}()
 		ctx.Next()
 	}
 }

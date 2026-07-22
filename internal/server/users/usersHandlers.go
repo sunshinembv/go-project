@@ -68,6 +68,7 @@ func (uh *UsersHandler) Register(ctx *gin.Context) {
 
 	if err := ctx.ShouldBindJSON(&user); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	uid, err := uh.userService.CreateUser(user)
@@ -85,6 +86,7 @@ func (uh *UsersHandler) UpdateUserByID(ctx *gin.Context) {
 
 	if err := ctx.ShouldBindJSON(&userUpdateReq); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	updatedName, updatedEmail, err := uh.userService.UpdateUserByUID(userID, userUpdateReq)

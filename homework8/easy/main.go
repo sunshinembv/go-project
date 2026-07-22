@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	StackEmptyErr = errors.New("stack is empty")
+	ErrStackEmpty = errors.New("stack is empty")
 )
 
 type Stack struct {
@@ -25,7 +25,7 @@ func (s *Stack) Push(value int) {
 
 func (s *Stack) Pop() (int, error) {
 	if len(s.Values) == 0 {
-		return 0, StackEmptyErr
+		return 0, ErrStackEmpty
 	}
 
 	lastIndex := len(s.Values) - 1
@@ -37,7 +37,7 @@ func (s *Stack) Pop() (int, error) {
 
 func (s *Stack) Peek() (int, error) {
 	if len(s.Values) == 0 {
-		return 0, StackEmptyErr
+		return 0, ErrStackEmpty
 	}
 	return s.Values[len(s.Values)-1], nil
 }

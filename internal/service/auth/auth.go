@@ -10,6 +10,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+var (
+	ErrInvalidToken = errors.New("invalid token")
+)
+
 type Claims struct {
 	jwt.RegisteredClaims
 
@@ -99,7 +103,7 @@ func (s HS256Signer) ParseAccessToken(tokenStr string, opt ParseOptions) (*Claim
 	}
 
 	if !tkn.Valid {
-		return nil, errors.New("invalid token")
+		return nil, ErrInvalidToken
 	}
 
 	return claims, nil
@@ -125,7 +129,7 @@ func (s HS256Signer) ParseRefreshToken(tokenStr string, opt ParseOptions) (*jwt.
 	}
 
 	if !tkn.Valid {
-		return nil, errors.New("refresh is invalid")
+		return nil, ErrInvalidToken
 	}
 
 	return claims, nil
