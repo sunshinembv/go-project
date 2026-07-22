@@ -12,11 +12,235 @@ import (
 	taskMocks "go-project/internal/mocks/tasks"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var errService = errors.New("service error")
+
+func newTaskBenchmarkRequest(
+	b *testing.B,
+	handler gin.HandlerFunc,
+	method string,
+	route string,
+	target string,
+	body string,
+) *resty.Request {
+	b.Helper()
+
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.New()
+	router.Use(func(ctx *gin.Context) {
+		ctx.Set("userID", "user-123")
+		ctx.Next()
+	})
+	router.Handle(method, route, handler)
+
+	httpSrv := httptest.NewServer(router)
+	b.Cleanup(httpSrv.Close)
+
+	req := resty.New().R()
+	req.Method = method
+	req.URL = httpSrv.URL + target
+
+	if body != "" {
+		req.Body = body
+		req.SetHeader("Content-Type", "application/json")
+	}
+
+	return req
+}
+
+func BenchmarkGetTasks(b *testing.B) {
+	service := taskMocks.NewMockTaskService(b)
+	service.EXPECT().
+		GetTasks("user-123").
+		Return([]tasksDomain.Task{
+			{
+				TID:   "task-123",
+				UID:   "user-123",
+				Title: "title",
+			},
+		}, nil)
+
+	handler := New(service)
+	req := newTaskBenchmarkRequest(
+		b,
+		handler.GetTasks,
+		http.MethodGet,
+		"/tasks",
+		"/tasks",
+		"",
+	)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		resp, err := req.Send()
+		if err != nil {
+			b.Fatalf("Failed to send request: %v", err)
+		}
+
+		if resp.StatusCode() != http.StatusOK {
+			b.Fatalf("Unexpected status code: got %d, want %d",
+				resp.StatusCode(),
+				http.StatusOK,
+			)
+		}
+	}
+}
+
+func BenchmarkGetTaskByTID(b *testing.B) {
+	service := taskMocks.NewMockTaskService(b)
+	service.EXPECT().
+		GetTaskByTID("user-123", "task-123").
+		Return(tasksDomain.Task{
+			TID:   "task-123",
+			UID:   "user-123",
+			Title: "title",
+		}, nil)
+
+	handler := New(service)
+	req := newTaskBenchmarkRequest(
+		b,
+		handler.GetTaskByTID,
+		http.MethodGet,
+		"/tasks/:id",
+		"/tasks/task-123",
+		"",
+	)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		resp, err := req.Send()
+		if err != nil {
+			b.Fatalf("Failed to send request: %v", err)
+		}
+
+		if resp.StatusCode() != http.StatusOK {
+			b.Fatalf("Unexpected status code: got %d, want %d",
+				resp.StatusCode(),
+				http.StatusOK,
+			)
+		}
+	}
+}
+
+func BenchmarkCreateTask(b *testing.B) {
+	reqBody := `{"title":"title","description":"description","status":"new"}`
+	reqObj := tasksDomain.TaskRequest{
+		Title:       "title",
+		Description: "description",
+		Status:      tasksDomain.NewStatus,
+	}
+
+	service := taskMocks.NewMockTaskService(b)
+	service.EXPECT().
+		CreateTask("user-123", reqObj).
+		Return("task-123", nil)
+
+	handler := New(service)
+	req := newTaskBenchmarkRequest(
+		b,
+		handler.CreateTask,
+		http.MethodPost,
+		"/tasks",
+		"/tasks",
+		reqBody,
+	)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		resp, err := req.Send()
+		if err != nil {
+			b.Fatalf("Failed to send request: %v", err)
+		}
+
+		if resp.StatusCode() != http.StatusOK {
+			b.Fatalf("Unexpected status code: got %d, want %d",
+				resp.StatusCode(),
+				http.StatusOK,
+			)
+		}
+	}
+}
+
+func BenchmarkUpdateTaskByTID(b *testing.B) {
+	reqBody := `{"title":"updated","description":"description","status":"completed"}`
+	reqObj := tasksDomain.TaskRequest{
+		Title:       "updated",
+		Description: "description",
+		Status:      tasksDomain.CompletedStatus,
+	}
+
+	service := taskMocks.NewMockTaskService(b)
+	service.EXPECT().
+		UpdateTaskByTID("user-123", "task-123", reqObj).
+		Return(tasksDomain.Task{
+			TID:         "task-123",
+			UID:         "user-123",
+			Title:       reqObj.Title,
+			Description: reqObj.Description,
+			Status:      reqObj.Status,
+		}, nil)
+
+	handler := New(service)
+	req := newTaskBenchmarkRequest(
+		b,
+		handler.UpdateTaskByTID,
+		http.MethodPut,
+		"/tasks/:id",
+		"/tasks/task-123",
+		reqBody,
+	)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		resp, err := req.Send()
+		if err != nil {
+			b.Fatalf("Failed to send request: %v", err)
+		}
+
+		if resp.StatusCode() != http.StatusOK {
+			b.Fatalf("Unexpected status code: got %d, want %d",
+				resp.StatusCode(),
+				http.StatusOK,
+			)
+		}
+	}
+}
+
+func BenchmarkDeleteTaskByTID(b *testing.B) {
+	service := taskMocks.NewMockTaskService(b)
+	service.EXPECT().
+		DeleteTaskByTID("user-123", "task-123").
+		Return(nil)
+
+	handler := New(service)
+	req := newTaskBenchmarkRequest(
+		b,
+		handler.DeleteTaskByTID,
+		http.MethodDelete,
+		"/tasks/:id",
+		"/tasks/task-123",
+		"",
+	)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		resp, err := req.Send()
+		if err != nil {
+			b.Fatalf("Failed to send request: %v", err)
+		}
+
+		if resp.StatusCode() != http.StatusOK {
+			b.Fatalf("Unexpected status code: got %d, want %d",
+				resp.StatusCode(),
+				http.StatusOK,
+			)
+		}
+	}
+}
 
 func performTaskRequest(
 	t *testing.T,
