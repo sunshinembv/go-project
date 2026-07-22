@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	NoSuchElementErr = errors.New("нет такого элемента")
+	ErrNoSuchElement = errors.New("нет такого элемента")
 )
 
 func binarySearch(input []int, num int) (int, error) {
@@ -27,7 +27,7 @@ func binarySearch(input []int, num int) (int, error) {
 		}
 	}
 
-	return -1, NoSuchElementErr
+	return -1, ErrNoSuchElement
 }
 
 func main() {
